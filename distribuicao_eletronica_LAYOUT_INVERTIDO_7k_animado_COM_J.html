@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Distribuição Eletrônica • Layout Invertido (até 7000 elétrons)</title>
+<style>
+  :root{
+    --fg:#111; --bg:#fff; --muted:#666; --card:#f7f7f9; --accent:#0b5; --line:#e5e5ea;
+    --pill:#fff; --pill-b:#ddd; --tbl-h:#fafafa;
+  }
+  .dark{
+    --fg:#eaeaea; --bg:#151617; --muted:#a9a9b0; --card:#1b1c1f; --accent:#1f9d55; --line:#2a2c31;
+    --pill:#1b1c1f; --pill-b:#36383f; --tbl-h:#1f2023;
+  }
+  html,body{height:100%}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;
+       color:var(--fg); background:var(--bg); margin:0; padding:24px; transition:background .2s, color .2s}
+  h1{margin:0 0 8px 0; font-size:22px}
+  .row{display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin:14px 0;}
+  label{font-weight:600; display:block; margin:8px 0 6px}
+  input[type="number"]{padding:8px 10px; border-radius:10px; border:1px solid var(--line);
+        width:200px; font-size:15px; background:var(--bg); color:var(--fg)}
+  button{padding:10px 14px; border-radius:12px; border:1px solid var(--fg);
+        background:var(--fg); color:var(--bg); cursor:pointer; font-weight:700}
+  button:hover{filter:brightness(1.05)}
+  .ghost{background:transparent; color:var(--fg)}
+  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace}
+  .muted{color:var(--muted); font-size:12px}
+  .pill{display:inline-block; background:var(--pill); border:1px solid var(--pill-b);
+        padding:6px 10px; border-radius:999px; margin:4px 6px 0 0}
+  table{width:100%; border-collapse:collapse; margin-top:10px}
+  th, td{border-bottom:1px solid var(--line); padding:8px 6px; text-align:left}
+  th{background:var(--tbl-h)}
+  .small{font-size:13px}
+  .grid{display:grid; grid-template-columns:1fr; gap:10px}
+  @media (min-width:1060px){
+    .grid{grid-template-columns:1.2fr 1fr}
+  }
+  .badge{font-weight:700; color:#fff; background:var(--accent); border-radius:8px; padding:2px 6px; font-size:12px}
+  .toolbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  .spacer{flex:1}
+  svg{width:100%; height:auto; background:transparent}
+  .cell{fill:none; stroke:var(--line);}
+  .orbtext{font: 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace; fill:var(--fg)}
+  .arrow{stroke:var(--muted); stroke-width:1.2}
+  .used{fill:var(--accent); stroke:var(--accent)}
+  .legend{display:flex; gap:12px; align-items:center; margin-top:8px}
+  .dot{width:12px; height:12px; border-radius:6px; background:var(--accent); display:inline-block; border:1px solid var(--accent)}
+  @media print {
+    .toolbar{display:none}
+    body{padding:0}
+    .card{border:0; margin:0}
+  }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>Distribuição Eletrônica — Madelung (até 7000 elétrons)</h1>
+    <div class="spacer"></div>
+    <button id="darkToggle" class="ghost" aria-pressed="false">🌙 Modo escuro</button>
+    <button id="printBtn">🧾 Gerar PDF</button>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label for="zin">Número atômico (Z)</label>
+        <input id="zin" type="number" value="118" min="1" max="7000" />
+        <div class="muted small">Intervalo aceito: 1 a 7000</div>
+      </div>
+      <div>
+        <label for="kin">Posição do elétron (k)</label>
+        <input id="kin" type="number" value="118" min="1" max="7000" />
+        <div class="muted small">Use 1 ≤ k ≤ Z.</div>
+      </div>
+      <div>
+        <button id="go">Calcular</button>
+        <button id="anim">▶️ Animar preenchimento</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div><span class="badge">Resultado</span></div>
+      <div id="configText" class="mono" style="margin-top:8px; font-size:16px; line-height:1.4">—</div>
+      <div id="onlyUsedCapsules" style="margin-top:10px"></div>
+      <table id="usedTable" class="small" style="display:none">
+        <thead><tr><th>Subnível</th><th>Capacidade</th><th>Elétrons preenchidos</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div><span class="badge">Endereço quântico (elétron k)</span></div>
+      <div id="qnums" class="mono" style="margin-top:8px; font-size:16px">—</div>
+      <div id="qwarn" class="muted small" style="margin-top:6px"></div>
+      <table id="whereTable" class="small" style="display:none">
+        <thead><tr><th>k</th><th>Subnível</th><th>n</th><th>l</th><th>m<sub>l</sub></th><th>m<sub>s</sub></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="align-items:flex-start">
+      <div style="flex:1">
+        <div><span class="badge">Diagrama energético (Madelung) – linhas por n, colunas por l</span></div>
+        <svg id="diagram" viewBox="0 0 900 600" role="img" aria-label="Diagrama de energia pela regra de Madelung (linhas=n, colunas=l)"></svg>
+        <div class="legend">
+          <span class="dot"></span><span class="muted small">subnível utilizado até Z</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // Spectroscopic letters INCLUDING 'j' (após 'i'):
+  const baseLetters = ["s","p","d","f","g","h","i","j","k","l","m","n","o","q","r","t","u","v","w","x","y","z"];
+  function letterFor(l){
+    if(l < baseLetters.length) return baseLetters[l];
+    const idx = l - baseLetters.length;
+    const first = String.fromCharCode(97 + Math.floor(idx / 26) % 26);
+    const second = String.fromCharCode(97 + (idx % 26));
+    return first + second;
+  }
+  function capFor(l){ return 2*(2*l+1); }
+
+  // Build big Madelung list
+  function buildMadelungList(){
+    const arr = [];
+    const NMAX = 120; // plenty to exceed 7000 electrons
+    for(let n=1;n<=NMAX;n++){
+      for(let l=0;l<n;l++){
+        const letter = letterFor(l);
+        arr.push({n, l, letter, orb:`${n}${letter}`, cap:capFor(l), sum:n+l});
+      }
+    }
+    arr.sort((a,b)=> (a.sum-b.sum) || (a.n-b.n));
+    let start = 1;
+    for(const r of arr){
+      r.startZ = start;
+      r.endZ = start + r.cap - 1;
+      start = r.endZ + 1;
+    }
+    return arr;
+  }
+
+  const MAD = buildMadelungList();
+
+  function fillForZ(Z){
+    const out = [];
+    let left = Z;
+    for(const r of MAD){
+      const take = Math.max(0, Math.min(r.cap, left));
+      out.push({...r, take});
+      left -= take;
+      if(left<=0) break;
+    }
+    return out;
+  }
+
+  function mlMsFor(n,l,p){
+    const orbitals = 2*l+1;
+    if(p<=orbitals){
+      const ml = -l + (p-1);
+      return {ml, ms:+0.5};
+    }else{
+      const offset = p - orbitals;
+      const ml = -l + (offset-1);
+      return {ml, ms:-0.5};
+    }
+  }
+
+  function locateK(k){
+    for(const r of MAD){
+      if(k>=r.startZ && k<=r.endZ){
+        const pos = k - r.startZ + 1;
+        return {...r, pos};
+      }
+    }
+    return null;
+  }
+
+  function compute(Z, k){
+    const used = fillForZ(Z);
+    const parts = used.filter(u=>u.take>0).map(u=>`${u.orb}${u.take}`);
+    const confStr = parts.join(" ");
+    let q = null, qstr="—", warn="", tableRow=null;
+    if(!(Number.isFinite(k)) || k<1 || k>Z){
+      warn = "Defina k tal que 1 ≤ k ≤ Z.";
+    }else{
+      const slot = locateK(k);
+      if(slot){
+        const p = slot.pos;
+        const {ml, ms} = mlMsFor(slot.n, slot.l, p);
+        q = { n:slot.n, l:slot.l, ml, ms, orb:slot.orb, k };
+        qstr = `n=${q.n}, l=${q.l} (${slot.letter}), m_l=${q.ml}, m_s=${q.ms>0 ? "+1/2" : "-1/2"}  —  (subnível ${slot.orb}, posição ${p} no subnível)`;
+        tableRow = [k, slot.orb, slot.n, slot.l, q.ml, (q.ms>0?"+1/2":"-1/2")];
+      }else{
+        warn = "k fora do intervalo suportado (tente Z ≤ 7000).";
+      }
+    }
+    return {confStr, used, q, qstr, warn, tableRow};
+  }
+
+  // RENDER
+  const cfg = document.getElementById('configText');
+  const caps = document.getElementById('onlyUsedCapsules');
+  const ut = document.getElementById('usedTable');
+  const utbody = ut.querySelector('tbody');
+  const qn = document.getElementById('qnums');
+  const qw = document.getElementById('qwarn');
+  const wt = document.getElementById('whereTable');
+  const wtbody = wt.querySelector('tbody');
+  const svg = document.getElementById('diagram');
+
+  function render(){
+    const Z = Number(document.getElementById('zin').value);
+    const k = Number(document.getElementById('kin').value);
+    const out = compute(Z, k);
+
+    cfg.textContent = out.confStr || "—";
+
+    caps.innerHTML = "";
+    out.used.forEach(u=>{
+      if(u.take>0){
+        const span = document.createElement('span');
+        span.className = "pill mono";
+        span.textContent = `${u.orb}${u.take}`;
+        caps.appendChild(span);
+      }
+    });
+
+    utbody.innerHTML = "";
+    out.used.forEach(u=>{
+      if(u.take>0){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td class="mono">${u.orb}</td><td>${u.cap}</td><td><strong>${u.take}</strong></td>`;
+        utbody.appendChild(tr);
+      }
+    });
+    ut.style.display = out.used.some(u=>u.take>0) ? "" : "none";
+
+    qn.textContent = out.qstr;
+    qw.textContent = out.warn;
+    wtbody.innerHTML = "";
+    if(out.tableRow){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${out.tableRow[0]}</td>
+                      <td class="mono">${out.tableRow[1]}</td>
+                      <td>${out.tableRow[2]}</td>
+                      <td>${out.tableRow[3]}</td>
+                      <td>${out.tableRow[4]}</td>
+                      <td>${out.tableRow[5]}</td>`;
+      wtbody.appendChild(tr);
+      wt.style.display = "";
+    }else{
+      wt.style.display = "none";
+    }
+
+    drawDiagram(out.used);
+  }
+
+  // Diagram auto-fit + diagonals for sums that include any used sublevel
+  function drawDiagram(used){
+    const W=900, H=600, padX=60, padY=40;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+
+    // bounds from used
+    let maxN = 1, maxL = 0, minSum=Infinity, maxSum=-Infinity;
+    const usedSums = new Set();
+    used.forEach(u => {
+      if(u.n>maxN) maxN=u.n;
+      if(u.l>maxL) maxL=u.l;
+      usedSums.add(u.n + u.l);
+      if(u.n+u.l<minSum) minSum=u.n+u.l;
+      if(u.n+u.l>maxSum) maxSum=u.n+u.l;
+    });
+    maxN = Math.max(maxN, 12);
+    maxL = Math.max(maxL, 6);
+
+    const cw = (W - 2*padX) / (maxL+1);
+    const ch = (H - 2*padY) / (maxN+1);
+
+    const mkText = (x,y,str)=>{
+      const t = document.createElementNS("http://www.w3.org/2000/svg","text");
+      t.setAttribute("x", x); t.setAttribute("y", y);
+      t.setAttribute("class","orbtext");
+      t.textContent = str;
+      return t;
+    };
+
+    // headers (note: now includes j)
+    for(let l=0;l<=maxL;l++){
+      const x = padX + l * cw;
+      const t = mkText(x, padY-14, letterFor(l));
+      t.setAttribute("text-anchor","middle");
+      svg.appendChild(t);
+    }
+    for(let n=1;n<=maxN;n++){
+      const y = padY + n * ch;
+      const t = mkText(padX-20, y+4, String(n));
+      t.setAttribute("text-anchor","end");
+      svg.appendChild(t);
+    }
+
+    // cells & labels only for 'used' to keep light
+    used.forEach(r=>{
+      const x = padX + r.l * cw;
+      const y = padY + r.n * ch;
+      const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+      rect.setAttribute("x", x-22); rect.setAttribute("y", y-14);
+      rect.setAttribute("width", 44); rect.setAttribute("height", 22);
+      rect.setAttribute("rx", 6); rect.setAttribute("class","cell");
+      svg.appendChild(rect);
+      const t = mkText(x, y, r.orb);
+      t.setAttribute("text-anchor","middle");
+      t.setAttribute("dominant-baseline","middle");
+      svg.appendChild(t);
+    });
+
+    // diagonals (n+l) that pass through any used sublevel
+    for(let s=minSum; s<=maxSum; s++){
+      if(!usedSums.has(s)) continue;
+      const pts = [];
+      for(let n=1; n<=maxN; n++){
+        const l = s - n;
+        if(l>=0 && l<=maxL && l < n){
+          const x = padX + l * cw;
+          const y = padY + n * ch;
+          pts.push([x,y]);
+        }
+      }
+      if(pts.length>1){
+        const line = document.createElementNS("http://www.w3.org/2000/svg","polyline");
+        line.setAttribute("fill","none");
+        line.setAttribute("class","arrow");
+        line.setAttribute("points", pts.map(p=>p.join(",")).join(" "));
+        svg.appendChild(line);
+      }
+    }
+
+    // highlight used
+    used.forEach(u=>{
+      if(u.take>0){
+        const x = padX + u.l * cw;
+        const y = padY + u.n * ch;
+        const dot = document.createElementNS("http://www.w3.org/2000/svg","circle");
+        dot.setAttribute("cx", x-22+6); dot.setAttribute("cy", y-14+6);
+        dot.setAttribute("r", 4);
+        dot.setAttribute("class","used");
+        svg.appendChild(dot);
+      }
+    });
+  }
+
+  // Animation
+  let animTimer=null;
+  function animateFill(){
+    if(animTimer) { clearInterval(animTimer); animTimer=null; }
+    const Z = Number(document.getElementById('zin').value);
+    const used = fillForZ(Z);
+    let i=0;
+    function step(){
+      const partial = used.map((u, idx)=> ({...u, take: idx<=i ? u.take : 0})).slice(0, i+1);
+      cfg.textContent = partial.filter(u=>u.take>0).map(u=>`${u.orb}${u.take}`).join(" ") || "—";
+      caps.innerHTML = "";
+      utbody.innerHTML = "";
+      partial.forEach(u=>{
+        if(u.take>0){
+          const span = document.createElement('span');
+          span.className = "pill mono";
+          span.textContent = `${u.orb}${u.take}`;
+          caps.appendChild(span);
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td class="mono">${u.orb}</td><td>${u.cap}</td><td><strong>${u.take}</strong></td>`;
+          utbody.appendChild(tr);
+        }
+      });
+      ut.style.display = partial.some(u=>u.take>0) ? "" : "none";
+      drawDiagram(partial);
+      i++;
+      if(i>=used.length){ clearInterval(animTimer); animTimer=null; }
+    }
+    step();
+    animTimer = setInterval(step, 250);
+  }
+
+  // UI
+  document.getElementById('go').addEventListener('click', render);
+  document.getElementById('anim').addEventListener('click', animateFill);
+  document.getElementById('printBtn').addEventListener('click', ()=>window.print());
+
+  // Dark mode
+  const darkBtn = document.getElementById('darkToggle');
+  function applyTheme(d){
+    document.documentElement.classList.toggle('dark', d);
+    darkBtn.setAttribute('aria-pressed', d ? 'true' : 'false');
+    darkBtn.textContent = d ? "☀️ Modo claro" : "🌙 Modo escuro";
+  }
+  const saved = localStorage.getItem('mad_dark_7k') === '1';
+  applyTheme(saved);
+  darkBtn.addEventListener('click', ()=>{
+    const d = !(document.documentElement.classList.contains('dark'));
+    applyTheme(d);
+    localStorage.setItem('mad_dark_7k', d ? '1' : '0');
+  });
+
+  // helper accessible inside drawDiagram
+  function letterFor(l){
+    if(l < baseLetters.length) return baseLetters[l];
+    const idx = l - baseLetters.length;
+    const first = String.fromCharCode(97 + Math.floor(idx / 26) % 26);
+    const second = String.fromCharCode(97 + (idx % 26));
+    return first + second;
+  }
+
+  // Initial render
+  render();
+})();
+</script>
+</body>
+</html>
